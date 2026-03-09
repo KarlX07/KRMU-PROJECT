@@ -88,6 +88,3 @@ Future: Dashboard Visualization
 
 To understand heuristic search algorithms and apply Genetic Algorithms to real-world logistics optimization problems.
 
-## 6. Setup & Execution Instructions
-
-### Step 1: Install Dependencies
