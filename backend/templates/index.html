@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fleet Management Dashboard</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f6f9;
+            text-align: center;
+            padding: 40px;
+        }
+        textarea {
+            width: 300px;
+            height: 120px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .card {
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            display: inline-block;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+<h1>Real-Time Fleet Optimization Dashboard</h1>
+
+<p>Enter delivery locations (one per line, format: x,y)</p>
+
+<textarea id="locationsInput">10,20
+30,40
+50,25
+60,10</textarea>
+
+<br>
+<button onclick="optimize()">Optimize Route</button>
+
+<div class="card" id="result" style="display:none;">
+    <h3>Optimization Results</h3>
+    <p id="randomDistance"></p>
+    <p id="optimizedDistance"></p>
+    <p id="distanceSaved"></p>
+    <p id="fuelSaved"></p>
+</div>
+
+<script>
+async function optimize() {
+
+    const rawInput = document.getElementById("locationsInput").value;
+    const lines = rawInput.split("\n");
+
+    let locations = [];
+
+    for (let line of lines) {
+        let parts = line.split(",");
+        if (parts.length === 2) {
+            locations.push([parseFloat(parts[0]), parseFloat(parts[1])]);
+        }
+    }
+
+    const response = await fetch('/optimize-route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locations: locations })
+    });
+
+    const data = await response.json();
+
+    document.getElementById("result").style.display = "block";
+    document.getElementById("randomDistance").innerText =
+        "Random Distance: " + data.metrics.random_distance.toFixed(2);
+    document.getElementById("optimizedDistance").innerText =
+        "Optimized Distance: " + data.metrics.optimized_distance.toFixed(2);
+    document.getElementById("distanceSaved").innerText =
+        "Distance Saved: " + data.metrics.distance_saved.toFixed(2);
+    document.getElementById("fuelSaved").innerText =
+        "Fuel Saved: " + data.metrics.fuel_saved.toFixed(2);
+}
+</script>
+
+</body>
+</html>
