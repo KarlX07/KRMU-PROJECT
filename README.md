@@ -23,7 +23,6 @@ This project addresses the Traveling Salesman Problem (TSP) using a heuristic ap
 - Uvicorn
 - Genetic Algorithm (Selection, Crossover, Mutation)
 - GitHub (Version Control)
-- Projexa AI (Repository Monitoring)
 
 ---
 
