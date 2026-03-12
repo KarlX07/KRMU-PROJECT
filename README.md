@@ -41,7 +41,7 @@ Future: Dashboard Visualization
 
 ---
 
-## 5. Features Implemented (Mid-Term Status)
+## 5. Features Implemented 
 
 - Genetic Algorithm for TSP
 - Route distance calculation
@@ -49,6 +49,10 @@ Future: Dashboard Visualization
 - FastAPI backend API
 - Swagger UI testing interface
 - GitHub integration
+- Basic Dashboard UI for route optimization
+- Dynamic input of delivery coordinates
+- Backend–Frontend integration using FastAPI
+  
 
 
 ---
