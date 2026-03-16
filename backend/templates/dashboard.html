@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fleet Intelligence Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1f2937, #111827);
+            color: #fff;
+            padding: 40px;
+        }
+
+        h1 {
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 40px;
+            letter-spacing: 1px;
+        }
+
+        .card-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            text-align: center;
+            transition: 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h2 {
+            font-size: 36px;
+            margin: 0;
+            color: #38bdf8;
+        }
+
+        .card p {
+            margin-top: 10px;
+            opacity: 0.8;
+            font-size: 14px;
+        }
+
+        .table-container {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+        }
+
+        th {
+            color: #38bdf8;
+            font-weight: 500;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        td {
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 14px;
+        }
+
+        .chart-container {
+            margin-top: 40px;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+    </style>
+</head>
+
+<body>
+
+<h1>Fleet Intelligence Analytics</h1>
+
+<div class="card-container">
+    <div class="card">
+        <h2>{{ total_runs }}</h2>
+        <p>Total Optimization Runs</p>
+    </div>
+
+    <div class="card">
+        <h2>{{ total_fuel_saved }}</h2>
+        <p>Total Fuel Saved (Liters)</p>
+    </div>
+
+    <div class="card">
+        <h2>{{ avg_distance_saved }}</h2>
+        <p>Average Distance Saved</p>
+    </div>
+</div>
+
+<div class="table-container">
+    <h2>Optimization History</h2>
+
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Random Distance</th>
+            <th>Optimized Distance</th>
+            <th>Fuel Saved</th>
+            <th>Timestamp</th>
+        </tr>
+
+        {% for record in records %}
+        <tr>
+            <td>{{ record.id }}</td>
+            <td>{{ record.random_distance }}</td>
+            <td>{{ record.optimized_distance }}</td>
+            <td>{{ record.fuel_saved }}</td>
+            <td>{{ record.timestamp }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<div class="chart-container">
+    <h2 style="text-align:center;">Fuel Saved Trend</h2>
+    <canvas id="fuelChart"></canvas>
+</div>
+
+<script>
+    const fuelData = [
+        {% for record in records %}
+            {{ record.fuel_saved }},
+        {% endfor %}
+    ];
+
+    const labels = [
+        {% for record in records %}
+            "Run {{ record.id }}",
+        {% endfor %}
+    ];
+
+    new Chart(document.getElementById('fuelChart'), {
+        type: 'line',
+        data: {
+            labels: labels.reverse(),
+            datasets: [{
+                label: 'Fuel Saved',
+                data: fuelData.reverse(),
+                borderColor: '#38bdf8',
+                backgroundColor: 'rgba(56,189,248,0.2)',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                pointRadius: 5,
+                pointBackgroundColor: '#38bdf8'
+            }]
+        },
+        options: {
+            plugins: {
+                legend: {
+                    labels: {
+                        color: "#fff"
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: "#ccc" }
+                },
+                y: {
+                    ticks: { color: "#ccc" }
+                }
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
