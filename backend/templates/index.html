@@ -1,60 +1,122 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Fleet Management Dashboard</title>
+    <title>Fleet Intelligence Dashboard</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         body {
-            font-family: Arial;
-            background: #f4f6f9;
-            text-align: center;
-            padding: 40px;
-        }
-        textarea {
-            width: 300px;
-            height: 120px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background: #007bff;
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f0f0f, #1a1a1a);
             color: white;
-            border: none;
-            cursor: pointer;
-            margin-top: 10px;
+            text-align: center;
         }
-        .card {
-            margin-top: 30px;
-            padding: 20px;
-            background: white;
-            display: inline-block;
+
+        .hero {
+            padding: 40px;
+            background: url('https://images.unsplash.com/photo-1581090700227-4c4f50f5a4c2') center/cover no-repeat;
+            background-color: rgba(0,0,0,0.7);
+            background-blend-mode: overlay;
+        }
+
+        .hero h1 {
+            font-size: 38px;
+        }
+
+        textarea {
+            width: 350px;
+            height: 120px;
+            padding: 10px;
             border-radius: 8px;
-            box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+            border: none;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: linear-gradient(45deg,#007bff,#00c6ff);
+            border: none;
+            color: white;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #00c6ff;
+        }
+
+        #map {
+            height: 400px;
+            margin: 40px auto;
+            width: 80%;
+            border-radius: 15px;
+        }
+
+        .card {
+            width: 600px;
+            margin: 30px auto;
+            padding: 30px;
+            background: rgba(255,255,255,0.08);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            display: none;
+        }
+
+        canvas {
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
 
-<h1>Real-Time Fleet Optimization Dashboard</h1>
+<div class="hero">
+    <h1>Fleet Intelligence System</h1>
+    <p>AI-Based Route Optimization | Delhi Hub</p>
+</div>
 
-<p>Enter delivery locations (one per line, format: x,y)</p>
+<p>Enter delivery locations (latitude,longitude per line)</p>
 
-<textarea id="locationsInput">10,20
-30,40
-50,25
-60,10</textarea>
+<textarea id="locationsInput">28.7041,77.1025
+28.5355,77.3910
+28.4595,77.0266
+28.6692,77.4538</textarea>
 
 <br>
 <button onclick="optimize()">Optimize Route</button>
 
-<div class="card" id="result" style="display:none;">
-    <h3>Optimization Results</h3>
-    <p id="randomDistance"></p>
-    <p id="optimizedDistance"></p>
-    <p id="distanceSaved"></p>
-    <p id="fuelSaved"></p>
+<div id="map"></div>
+
+<div class="card" id="result">
+    <h3>Optimization Metrics</h3>
+    <p id="truck1Distance"></p>
+    <p id="truck2Distance"></p>
+    <p id="totalFuelSaved"></p>
+
+    <canvas id="metricsChart"></canvas>
 </div>
 
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
 <script>
+
+let map = L.map('map').setView([28.6139, 77.2090], 10);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+let routeLine1;
+let routeLine2;
+let chart;
+
 async function optimize() {
 
     const rawInput = document.getElementById("locationsInput").value;
@@ -77,16 +139,57 @@ async function optimize() {
 
     const data = await response.json();
 
+    if (!data.truck1 || !data.truck2) {
+        alert("Backend response error.");
+        return;
+    }
+
     document.getElementById("result").style.display = "block";
-    document.getElementById("randomDistance").innerText =
-        "Random Distance: " + data.metrics.random_distance.toFixed(2);
-    document.getElementById("optimizedDistance").innerText =
-        "Optimized Distance: " + data.metrics.optimized_distance.toFixed(2);
-    document.getElementById("distanceSaved").innerText =
-        "Distance Saved: " + data.metrics.distance_saved.toFixed(2);
-    document.getElementById("fuelSaved").innerText =
-        "Fuel Saved: " + data.metrics.fuel_saved.toFixed(2);
+
+    const t1 = data.truck1;
+    const t2 = data.truck2;
+
+    document.getElementById("truck1Distance").innerText =
+        "Truck 1 Optimized Distance: " + t1.metrics.optimized_distance.toFixed(2);
+
+    document.getElementById("truck2Distance").innerText =
+        "Truck 2 Optimized Distance: " + t2.metrics.optimized_distance.toFixed(2);
+
+    document.getElementById("totalFuelSaved").innerText =
+        "Total Fuel Saved: " +
+        (t1.metrics.fuel_saved + t2.metrics.fuel_saved).toFixed(2);
+
+    // Clear old routes
+    if (routeLine1) map.removeLayer(routeLine1);
+    if (routeLine2) map.removeLayer(routeLine2);
+
+    // Draw Truck 1 Route (Cyan)
+    routeLine1 = L.polyline(t1.route, {color: 'cyan'}).addTo(map);
+
+    // Draw Truck 2 Route (Orange)
+    routeLine2 = L.polyline(t2.route, {color: 'orange'}).addTo(map);
+
+    map.fitBounds(routeLine1.getBounds());
+
+    // Update Chart
+    if (chart) chart.destroy();
+
+    chart = new Chart(document.getElementById('metricsChart'), {
+        type: 'bar',
+        data: {
+            labels: ['Truck 1', 'Truck 2'],
+            datasets: [{
+                label: 'Optimized Distance',
+                data: [
+                    t1.metrics.optimized_distance,
+                    t2.metrics.optimized_distance
+                ],
+                backgroundColor: ['cyan', 'orange']
+            }]
+        }
+    });
 }
+
 </script>
 
 </body>
