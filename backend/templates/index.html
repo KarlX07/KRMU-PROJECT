@@ -3,10 +3,7 @@
 <head>
     <title>Fleet Intelligence Dashboard</title>
 
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
@@ -19,14 +16,8 @@
         }
 
         .hero {
-            padding: 40px;
-            background: url('https://images.unsplash.com/photo-1581090700227-4c4f50f5a4c2') center/cover no-repeat;
-            background-color: rgba(0,0,0,0.7);
-            background-blend-mode: overlay;
-        }
-
-        .hero h1 {
-            font-size: 38px;
+            padding: 50px;
+            background: rgba(0,0,0,0.7);
         }
 
         textarea {
@@ -45,33 +36,34 @@
             color: white;
             border-radius: 30px;
             cursor: pointer;
-            transition: 0.3s;
-        }
-
-        button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 15px #00c6ff;
         }
 
         #map {
             height: 400px;
             margin: 40px auto;
-            width: 80%;
+            width: 85%;
             border-radius: 15px;
         }
 
         .card {
-            width: 600px;
+            width: 700px;
             margin: 30px auto;
             padding: 30px;
             background: rgba(255,255,255,0.08);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
             display: none;
         }
 
-        canvas {
-            margin-top: 20px;
+        .metric {
+            font-size: 18px;
+            margin: 6px 0;
+        }
+
+        .highlight {
+            font-size: 22px;
+            font-weight: bold;
+            color: #00ffcc;
         }
     </style>
 </head>
@@ -79,7 +71,7 @@
 
 <div class="hero">
     <h1>Fleet Intelligence System</h1>
-    <p>AI-Based Route Optimization | Delhi Hub</p>
+    <p>AI-Based Multi-Vehicle Route Optimization | Delhi Hub</p>
 </div>
 
 <p>Enter delivery locations (latitude,longitude per line)</p>
@@ -95,10 +87,16 @@
 <div id="map"></div>
 
 <div class="card" id="result">
-    <h3>Optimization Metrics</h3>
-    <p id="truck1Distance"></p>
-    <p id="truck2Distance"></p>
-    <p id="totalFuelSaved"></p>
+    <h3>Optimization Summary</h3>
+
+    <div class="metric" id="truck1Distance"></div>
+    <div class="metric" id="truck1ETA"></div>
+
+    <div class="metric" id="truck2Distance"></div>
+    <div class="metric" id="truck2ETA"></div>
+
+    <div class="metric highlight" id="totalETA"></div>
+    <div class="metric highlight" id="totalCostSaved"></div>
 
     <canvas id="metricsChart"></canvas>
 </div>
@@ -116,6 +114,20 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let routeLine1;
 let routeLine2;
 let chart;
+let truckMarker1;
+let truckMarker2;
+
+function animateTruck(route, marker) {
+    let i = 0;
+    function move() {
+        if (i < route.length) {
+            marker.setLatLng(route[i]);
+            i++;
+            setTimeout(move, 1000);
+        }
+    }
+    move();
+}
 
 async function optimize() {
 
@@ -139,39 +151,43 @@ async function optimize() {
 
     const data = await response.json();
 
-    if (!data.truck1 || !data.truck2) {
-        alert("Backend response error.");
-        return;
-    }
-
     document.getElementById("result").style.display = "block";
 
     const t1 = data.truck1;
     const t2 = data.truck2;
 
     document.getElementById("truck1Distance").innerText =
-        "Truck 1 Optimized Distance: " + t1.metrics.optimized_distance.toFixed(2);
+        "Truck 1 Distance: " + t1.metrics.optimized_distance + " km";
+
+    document.getElementById("truck1ETA").innerText =
+        "Truck 1 ETA: " + t1.metrics.eta_hours + " hours";
 
     document.getElementById("truck2Distance").innerText =
-        "Truck 2 Optimized Distance: " + t2.metrics.optimized_distance.toFixed(2);
+        "Truck 2 Distance: " + t2.metrics.optimized_distance + " km";
 
-    document.getElementById("totalFuelSaved").innerText =
-        "Total Fuel Saved: " +
-        (t1.metrics.fuel_saved + t2.metrics.fuel_saved).toFixed(2);
+    document.getElementById("truck2ETA").innerText =
+        "Truck 2 ETA: " + t2.metrics.eta_hours + " hours";
 
-    // Clear old routes
+    document.getElementById("totalETA").innerText =
+        "Fleet Completion Time: " + data.total_eta + " hours";
+
+    document.getElementById("totalCostSaved").innerText =
+        "Total Cost Saved: ₹" + data.total_cost_saved;
+
     if (routeLine1) map.removeLayer(routeLine1);
     if (routeLine2) map.removeLayer(routeLine2);
 
-    // Draw Truck 1 Route (Cyan)
     routeLine1 = L.polyline(t1.route, {color: 'cyan'}).addTo(map);
-
-    // Draw Truck 2 Route (Orange)
     routeLine2 = L.polyline(t2.route, {color: 'orange'}).addTo(map);
 
     map.fitBounds(routeLine1.getBounds());
 
-    // Update Chart
+    truckMarker1 = L.marker(t1.route[0]).addTo(map);
+    truckMarker2 = L.marker(t2.route[0]).addTo(map);
+
+    animateTruck(t1.route, truckMarker1);
+    animateTruck(t2.route, truckMarker2);
+
     if (chart) chart.destroy();
 
     chart = new Chart(document.getElementById('metricsChart'), {
@@ -179,7 +195,7 @@ async function optimize() {
         data: {
             labels: ['Truck 1', 'Truck 2'],
             datasets: [{
-                label: 'Optimized Distance',
+                label: 'Distance (km)',
                 data: [
                     t1.metrics.optimized_distance,
                     t2.metrics.optimized_distance
