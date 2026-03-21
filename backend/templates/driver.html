@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Driver Simulator</title>
+</head>
+<body>
+
+<h2>Driver Live GPS Simulator</h2>
+<button onclick="start()">Start Sending Location</button>
+
+<script>
+let socket;
+
+function start() {
+
+    socket = new WebSocket("ws://127.0.0.1:8000/ws/driver");
+
+    socket.onopen = function() {
+        console.log("Connected to server");
+
+        let lat = 28.6139;
+        let lng = 77.2090;
+
+        setInterval(() => {
+            lat += 0.001;
+            lng += 0.001;
+
+            socket.send(JSON.stringify({
+                lat: lat,
+                lng: lng
+            }));
+
+            console.log("Sent:", lat, lng);
+
+        }, 2000);
+    };
+
+    socket.onerror = function(error) {
+        console.log("WebSocket Error:", error);
+    };
+
+    socket.onclose = function() {
+        console.log("WebSocket Closed");
+    };
+}
+</script>
+
+</body>
+</html>

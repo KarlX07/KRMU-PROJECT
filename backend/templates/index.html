@@ -105,6 +105,10 @@
 
 <script>
 
+// ---------------------
+// MAP INITIALIZATION
+// ---------------------
+
 let map = L.map('map').setView([28.6139, 77.2090], 10);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -116,6 +120,29 @@ let routeLine2;
 let chart;
 let truckMarker1;
 let truckMarker2;
+let liveDriverMarker;
+
+// ---------------------
+// WEBSOCKET LISTENER
+// ---------------------
+
+let socket = new WebSocket("ws://127.0.0.1:8000/ws/driver");
+
+socket.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+
+    if (!liveDriverMarker) {
+        liveDriverMarker = L.marker([data.lat, data.lng], {
+            title: "Live Driver"
+        }).addTo(map).bindPopup("Live Driver");
+    } else {
+        liveDriverMarker.setLatLng([data.lat, data.lng]);
+    }
+};
+
+// ---------------------
+// ANIMATION FUNCTION
+// ---------------------
 
 function animateTruck(route, marker) {
     let i = 0;
@@ -128,6 +155,10 @@ function animateTruck(route, marker) {
     }
     move();
 }
+
+// ---------------------
+// OPTIMIZATION FUNCTION
+// ---------------------
 
 async function optimize() {
 
@@ -176,14 +207,16 @@ async function optimize() {
 
     if (routeLine1) map.removeLayer(routeLine1);
     if (routeLine2) map.removeLayer(routeLine2);
+    if (truckMarker1) map.removeLayer(truckMarker1);
+    if (truckMarker2) map.removeLayer(truckMarker2);
 
     routeLine1 = L.polyline(t1.route, {color: 'cyan'}).addTo(map);
     routeLine2 = L.polyline(t2.route, {color: 'orange'}).addTo(map);
 
     map.fitBounds(routeLine1.getBounds());
 
-    truckMarker1 = L.marker(t1.route[0]).addTo(map);
-    truckMarker2 = L.marker(t2.route[0]).addTo(map);
+    truckMarker1 = L.marker(t1.route[0]).addTo(map).bindPopup("Truck 1");
+    truckMarker2 = L.marker(t2.route[0]).addTo(map).bindPopup("Truck 2");
 
     animateTruck(t1.route, truckMarker1);
     animateTruck(t2.route, truckMarker2);
