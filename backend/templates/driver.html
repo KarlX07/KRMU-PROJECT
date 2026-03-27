@@ -4,264 +4,156 @@
     <title>🚚 Driver App - Fleet Intelligence</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            font-family: Arial;
             background: #0f172a;
-            color: #fff;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            color: white;
         }
-        .header {
-            background: linear-gradient(90deg, #1e293b, #0f172a);
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .header h2 { font-size: 18px; color: #38bdf8; }
-        .status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-        }
-        .status-dot {
-            width: 12px; height: 12px; border-radius: 50%;
-            background: #ef4444;
-        }
-        .status-dot.active {
-            background: #22c55e;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        #map { height: 75vh; }
 
         .controls {
-            padding: 15px 20px;
+            padding: 10px;
             background: #1e293b;
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
         }
-        select, button {
-            padding: 10px 16px;
-            border-radius: 8px;
+
+        button {
+            padding: 10px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        .status {
             font-size: 14px;
-        }
-        select {
-            background: #0f172a;
-            color: white;
-            border: 1px solid #475569;
-            flex: 1;
-            min-width: 200px;
-        }
-        .btn-start { background: #22c55e; color: black; font-weight: 600; }
-        .btn-stop { background: #ef4444; color: white; font-weight: 600; display: none; }
-
-        #map { flex: 1; }
-
-        .info-bar {
-            padding: 12px 20px;
-            background: #1e293b;
-            display: flex;
-            justify-content: space-around;
-            font-size: 14px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        .info-item span { color: #94a3b8; }
-
-        .alert-box {
-            position: absolute;
-            top: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #ef4444;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: 600;
-            display: none;
-            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
-            z-index: 1000;
+            margin-top: 5px;
         }
     </style>
 </head>
-<body>
 
-<div class="header">
-    <h2>🚚 Live Driver App</h2>
-    <div class="status">
-        <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">Disconnected</span>
-    </div>
-</div>
+<body>
 
 <div class="controls">
     <select id="vehicleSelect">
-        <option value="">-- Select Your Vehicle --</option>
+        <option value="">Select Vehicle</option>
         {% for v in vehicles %}
         <option value="{{ v.id }}">{{ v.vehicle_name }} - {{ v.driver_name }}</option>
         {% endfor %}
     </select>
-    <button class="btn-start" id="startBtn" onclick="startTracking()">▶ Start Live Tracking</button>
-    <button class="btn-stop" id="stopBtn" onclick="stopTracking()">⏹ Stop Tracking</button>
-</div>
 
-<div class="alert-box" id="alertBox">⚠️ You have deviated from the assigned route!</div>
+    <button onclick="startTracking()">Start</button>
+    <button onclick="stopTracking()">Stop</button>
+
+    <p>Lat: <span id="lat">--</span></p>
+    <p>Lng: <span id="lng">--</span></p>
+    <p class="status" id="status">Status: Idle</p>
+</div>
 
 <div id="map"></div>
 
-<div class="info-bar">
-    <div class="info-item"><span>Lat:</span> <strong id="infoLat">--</strong></div>
-    <div class="info-item"><span>Lng:</span> <strong id="infoLng">--</strong></div>
-    <div class="info-item"><span>Speed:</span> <strong id="infoSpeed">-- km/h</strong></div>
-    <div class="info-item"><span>Updates:</span> <strong id="infoCount">0</strong></div>
-</div>
-
 <script>
-const WAREHOUSE = [28.6139, 77.2090];
-let map = L.map('map').setView(WAREHOUSE, 12);
+let map = L.map('map').setView([28.6139, 77.2090], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+let marker = null;
 let socket = null;
-let driverMarker = null;
-let routeLine = null;
-let trackingInterval = null;
-let sendCount = 0;
-let currentSpeed = 0;
+let watchId = null;
 
-let roadPath = [];
-let pathIndex = 0;
+function startTracking() {
+    const vehicleId = document.getElementById("vehicleSelect").value;
 
-// Sample delivery stops in Delhi NCR
-const DELIVERY_STOPS = [
-    [28.6139, 77.2090],   // Warehouse
-    [28.7041, 77.1025],   // Rohini
-    [28.6692, 77.4538],   // Ghaziabad
-    [28.5355, 77.3910],   // Noida
-    [28.4595, 77.0266]    // Gurgaon
-];
-
-async function fetchRealRoadRoute() {
-    const coords = DELIVERY_STOPS.map(p => `${p[1]},${p[0]}`).join(';');
-    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
-    
-    try {
-        const res = await fetch(url);
-        const data = await res.json();
-        return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-    } catch(e) {
-        console.log("OSRM failed, using fallback");
-        return DELIVERY_STOPS;
-    }
-}
-
-async function startTracking() {
-    const vehicleId = document.getElementById('vehicleSelect').value;
     if (!vehicleId) {
-        alert("Please select your vehicle first!");
+        alert("Select vehicle first");
         return;
     }
 
-    document.getElementById('statusText').textContent = 'Connecting...';
-    roadPath = await fetchRealRoadRoute();
-    pathIndex = 0;
+    document.getElementById("status").textContent = "Status: Connecting...";
 
-    // Draw route
-    if (routeLine) map.removeLayer(routeLine);
-    routeLine = L.polyline(roadPath, { color: '#38bdf8', weight: 6, opacity: 0.85 }).addTo(map);
-
-    map.fitBounds(roadPath, { padding: [40, 40] });
-
-    // Connect WebSocket
-    socket = new WebSocket(`ws://${location.host}/ws/driver/${vehicleId}`);
+    // ✅ FIX: handle https (ngrok) properly
+    const protocol = location.protocol === "https:" ? "wss" : "ws";
+    socket = new WebSocket(`${protocol}://${location.host}/ws/driver/${vehicleId}`);
 
     socket.onopen = () => {
-        document.getElementById('statusDot').classList.add('active');
-        document.getElementById('statusText').textContent = '🟢 Live Tracking';
-        document.getElementById('startBtn').style.display = 'none';
-        document.getElementById('stopBtn').style.display = 'inline-block';
+        console.log("WebSocket Connected");
+        document.getElementById("status").textContent = "Status: Live Tracking";
 
-        trackingInterval = setInterval(sendLocation, 1800);  // every 1.8 sec
+        if (!navigator.geolocation) {
+            alert("Geolocation not supported");
+            return;
+        }
+
+        watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+
+                console.log("LOCATION:", lat, lng);
+
+                document.getElementById("lat").textContent = lat.toFixed(5);
+                document.getElementById("lng").textContent = lng.toFixed(5);
+
+                // Send to backend
+                socket.send(JSON.stringify({ lat, lng }));
+
+                // Update map
+                if (!marker) {
+                    marker = L.marker([lat, lng]).addTo(map);
+                } else {
+                    marker.setLatLng([lat, lng]);
+                }
+
+                map.setView([lat, lng], 15);
+            },
+            (err) => {
+                console.log("FULL GPS ERROR:", err);
+
+                let msg = "";
+                switch(err.code) {
+                    case 1:
+                        msg = "Permission denied ❌";
+                        break;
+                    case 2:
+                        msg = "Position unavailable 📡";
+                        break;
+                    case 3:
+                        msg = "Timeout ⏳";
+                        break;
+                    default:
+                        msg = err.message;
+                }
+
+                alert("GPS ERROR: " + msg);
+                document.getElementById("status").textContent = "Status: GPS Error";
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 10000
+            }
+        );
     };
 
-    socket.onclose = () => {
-        document.getElementById('statusDot').classList.remove('active');
-        document.getElementById('statusText').textContent = 'Disconnected';
+    socket.onerror = () => {
+        alert("WebSocket connection failed ❌");
+        document.getElementById("status").textContent = "Status: Connection Failed";
     };
 }
 
 function stopTracking() {
-    if (socket) socket.close();
-    if (trackingInterval) clearInterval(trackingInterval);
-    document.getElementById('startBtn').style.display = 'inline-block';
-    document.getElementById('stopBtn').style.display = 'none';
-    document.getElementById('statusText').textContent = 'Stopped';
-}
-
-function sendLocation() {
-    if (pathIndex >= roadPath.length - 1) {
-        stopTracking();
-        document.getElementById('statusText').textContent = '✅ Route Completed!';
-        return;
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
     }
 
-    const [lat, lng] = roadPath[pathIndex];
-    pathIndex++;
-
-    const payload = { lat: lat, lng: lng };
-    if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify(payload));
-        sendCount++;
-        document.getElementById('infoCount').textContent = sendCount;
+    if (socket) {
+        socket.close();
     }
 
-    // Update marker
-    if (!driverMarker) {
-        driverMarker = L.marker([lat, lng], {
-            icon: L.icon({
-                iconUrl: "https://cdn-icons-png.flaticon.com/512/1995/1995520.png",
-                iconSize: [48, 48],
-                iconAnchor: [24, 24]
-            })
-        }).addTo(map).bindTooltip("You are here", { permanent: true });
-    } else {
-        driverMarker.setLatLng([lat, lng]);
-    }
-
-    map.panTo([lat, lng]);
-
-    // Speed calculation
-    if (pathIndex > 1) {
-        const prev = roadPath[pathIndex - 2];
-        const dist = haversine(prev, [lat, lng]);
-        currentSpeed = (dist / 1.8) * 3600;   // km/h
-        document.getElementById('infoSpeed').textContent = currentSpeed.toFixed(1) + " km/h";
-    }
-
-    document.getElementById('infoLat').textContent = lat.toFixed(5);
-    document.getElementById('infoLng').textContent = lng.toFixed(5);
-
-    // Geofence Alert (more than 35km from warehouse)
-    if (haversine(WAREHOUSE, [lat, lng]) > 35) {
-        document.getElementById('alertBox').style.display = 'block';
-    } else {
-        document.getElementById('alertBox').style.display = 'none';
-    }
-}
-
-// Haversine function
-function haversine(p1, p2) {
-    const R = 6371;
-    const dLat = (p2[0] - p1[0]) * Math.PI / 180;
-    const dLon = (p2[1] - p1[1]) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(p1[0]*Math.PI/180) * Math.cos(p2[0]*Math.PI/180) * Math.sin(dLon/2)**2;
-    return R * 2 * Math.asin(Math.sqrt(a));
+    document.getElementById("status").textContent = "Status: Stopped";
+    alert("Tracking stopped");
 }
 </script>
+
 </body>
 </html>
