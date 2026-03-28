@@ -1,93 +1,122 @@
-# Real-Time Fleet Management & Route Optimization
+# 🚚 Real-Time Fleet Management & Route Optimization System
 
-## 1. Project Overview
+## 📌 Project Overview
 
-This project implements a Genetic Algorithm to optimize delivery routes using the Traveling Salesman Problem (TSP) approach. The system minimizes total travel distance, which directly reduces fuel consumption and operational costs in logistics operations.
+This project is a **real-time fleet management and route optimization
+system** that combines **Genetic Algorithms, K-Means clustering, and
+OSRM routing** to optimize delivery routes for multiple vehicles.
 
-The backend is built using FastAPI and exposes an API endpoint to compute optimized delivery routes.
+It not only computes optimal delivery paths but also provides **live GPS
+tracking, real-time updates, and intelligent route monitoring**, making
+it a near production-level logistics solution.
 
----
+------------------------------------------------------------------------
 
-## 2. Problem Statement
+## ❗ Problem Statement
 
-Logistics companies face high operational costs due to inefficient routing and increasing fuel prices. Manual route planning becomes ineffective as delivery points increase, especially in large-scale scenarios.
+Logistics companies face:
 
-This project addresses the Traveling Salesman Problem (TSP) using a heuristic approach (Genetic Algorithm) to find near-optimal routes efficiently.
+-   High fuel costs due to inefficient routing\
+-   Poor scalability in manual route planning\
+-   Lack of real-time monitoring of delivery vehicles\
+-   Inability to handle multi-vehicle routing efficiently
 
----
+This project solves these issues by combining **AI-based optimization
+with real-time tracking and visualization**.
 
-## 3. Technology Stack
+------------------------------------------------------------------------
 
-- Python
-- FastAPI
-- Uvicorn
-- Genetic Algorithm (Selection, Crossover, Mutation)
-- GitHub (Version Control)
+## 🚀 Key Features
 
----
+### 🔹 Optimization Engine
 
-## 4. System Architecture
+-   Genetic Algorithm for solving TSP (Traveling Salesman Problem)
+-   K-Means clustering for multi-truck route distribution
+-   Near-optimal route generation
 
-Driver / GPS Data (Simulated Input)
-        ↓
-FastAPI Backend
-        ↓
-Genetic Algorithm Optimization Engine
-        ↓
-Optimized Route Output
-        ↓
-Future: Dashboard Visualization
+### 🔹 Real-Time System
 
----
+-   Live GPS tracking using WebSockets
+-   Driver location updates in real time
+-   Vehicle status monitoring (active/idle)
 
-## 5. Features Implemented 
+### 🔹 Smart Routing
 
-- Genetic Algorithm for TSP
-- Route distance calculation
-- Selection, Crossover, Mutation operations
-- FastAPI backend API
-- Swagger UI testing interface
-- GitHub integration
-- Basic Dashboard UI for route optimization
-- Dynamic input of delivery coordinates
-- Backend–Frontend integration using FastAPI
-  
+-   OSRM integration for real road distance and routes
+-   Accurate ETA calculation
+-   Real-world path visualization
 
+### 🔹 Visualization
 
----
+-   Interactive map using Leaflet.js
+-   Animated truck movement
+-   Multi-route display with different colors
 
+### 🔹 Intelligent Features
 
-## 6. Setup & Execution Instructions
+-   Route deviation detection
+-   Fuel and cost savings estimation
+-   Performance metrics
 
-- Step 1: Install Dependencies
-  pip install fastapi uvicorn
+------------------------------------------------------------------------
 
-- Step 2: Run Backend Server
-  uvicorn backend.main:app --reload
+## 🛠 Technology Stack
 
-- Step 3: Open API Documentation
-  http://127.0.0.1:8000/docs
+### Backend
 
-- Step 4: Test Optimization API
-  Use POST /optimize-route with JSON input like:
+-   Python
+-   FastAPI
+-   Uvicorn
+-   WebSockets
+-   Requests
 
-{
-"locations": [[10,20], [30,40], [50,25], [60,10]]
-}
+### Frontend
 
-## 7. Future Scope
+-   HTML, CSS, JavaScript
+-   Leaflet.js
 
-  Real-time GPS tracking
+### Algorithms
 
-  Multi-vehicle optimization
+-   Genetic Algorithm
+-   K-Means Clustering
+-   OSRM Routing
 
-  Fuel analytics
+------------------------------------------------------------------------
 
-  Live dashboard
+## 🏗 System Architecture
 
-  Cloud deployment
+Driver (Mobile GPS) ↓ WebSocket (Live Data) ↓ FastAPI Backend ↓
+Optimization Engine (GA + K-Means) ↓ OSRM Routing Engine ↓ Frontend
+Dashboard
 
-## 8. Academic Objective
+------------------------------------------------------------------------
 
-To understand heuristic search algorithms and apply Genetic Algorithms to real-world logistics optimization problems.
+## ⚙️ Setup & Execution
 
+### Install Dependencies
+
+pip install fastapi uvicorn requests scikit-learn
+
+### Run Server
+
+uvicorn backend.main:app --reload
+
+### Open
+
+http://127.0.0.1:8000
+
+------------------------------------------------------------------------
+
+## 📈 Future Enhancements
+
+-   Traffic prediction
+-   Dynamic routing
+-   Driver scoring
+-   Cloud deployment
+
+------------------------------------------------------------------------
+
+## 🎯 Conclusion
+
+A full-stack intelligent fleet system combining AI, real-time tracking,
+and optimization.
