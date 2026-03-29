@@ -2,15 +2,31 @@
 <html>
 <head>
     <title>Fleet Intelligence - Route Optimizer</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <!-- ✅ FIXED LEAFLET CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #fff; height: 100vh; display: flex; }
+
         .sidebar { width: 260px; background: linear-gradient(180deg, #1e1b4b, #0f172a); padding: 25px 20px; border-right: 1px solid rgba(255,255,255,0.1); }
         .sidebar h1 { color: #818cf8; font-size: 24px; margin-bottom: 35px; }
-        .nav-item { padding: 14px 18px; margin: 8px 0; border-radius: 10px; color: #94a3b8; text-decoration: none; display: block; font-size: 15px; }
-        .nav-item:hover, .nav-item.active { background: rgba(129,140,248,0.25); color: white; }
+
+        .nav-item {
+            padding: 14px 18px;
+            margin: 8px 0;
+            border-radius: 10px;
+            color: #94a3b8;
+            text-decoration: none;
+            display: block;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: rgba(129,140,248,0.25);
+            color: white;
+        }
 
         .main { flex: 1; position: relative; }
         #map { width: 100%; height: 100vh; }
@@ -27,7 +43,8 @@
             z-index: 1000;
         }
 
-        .control-panel h3 { color: #94a3b8; margin-bottom: 15px; }
+        .control-panel h3 { color: #94a3b8; margin-bottom: 10px; }
+
         select, textarea, button {
             width: 100%;
             padding: 12px;
@@ -36,20 +53,15 @@
             border: 1px solid #475569;
             background: #1e2937;
             color: white;
-            font-size: 14px;
         }
-        textarea { height: 130px; resize: none; font-family: monospace; }
+
+        textarea { height: 130px; font-family: monospace; }
 
         .optimize-btn {
             background: linear-gradient(90deg, #6366f1, #a5b4fc);
             color: black;
-            font-weight: 700;
-            padding: 14px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
+            font-weight: bold;
             cursor: pointer;
-            margin-top: 8px;
         }
 
         .metrics {
@@ -61,6 +73,7 @@
             gap: 12px;
             z-index: 1000;
         }
+
         .card {
             background: rgba(15,23,42,0.96);
             padding: 16px 20px;
@@ -68,8 +81,9 @@
             min-width: 190px;
             border: 1px solid rgba(255,255,255,0.1);
         }
-        .card .label { font-size: 13px; color: #94a3b8; }
-        .card .value { font-size: 21px; font-weight: 700; color: #38bdf8; margin-top: 6px; }
+
+        .label { font-size: 13px; color: #94a3b8; }
+        .value { font-size: 20px; font-weight: bold; color: #38bdf8; }
 
         #loadingOverlay {
             position: absolute;
@@ -80,13 +94,23 @@
             justify-content: center;
             flex-direction: column;
             z-index: 2000;
-            color: white;
-            gap: 15px;
         }
-        .spinner { width: 55px; height: 55px; border: 6px solid rgba(255,255,255,0.2); border-top-color: #818cf8; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 6px solid rgba(255,255,255,0.2);
+            border-top-color: #818cf8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
+
 <body>
 
 <div class="sidebar">
@@ -101,32 +125,35 @@
 
     <div id="loadingOverlay">
         <div class="spinner"></div>
-        <p>Running Genetic Algorithm + Finding Real Routes...</p>
+        <p>Optimizing routes...</p>
     </div>
 
     <div class="control-panel">
-        <h3>📍 Delivery Points (one per line)</h3>
+        <h3>📍 Delivery Points</h3>
+
         <textarea id="locationsInput">28.7041,77.1025
 28.5355,77.3910
 28.4595,77.0266
 28.6692,77.4538
 28.6139,77.2090</textarea>
 
-        <h3>🚚 Number of Trucks</h3>
+        <h3>🚚 Trucks</h3>
+
         <select id="numTrucks">
             <option value="2">2 Trucks</option>
             <option value="3">3 Trucks</option>
             <option value="4">4 Trucks</option>
         </select>
 
-        <button class="optimize-btn" onclick="optimizeRoute()">🚀 Optimize Routes</button>
+        <button class="optimize-btn" onclick="optimizeRoute()">🚀 Optimize</button>
     </div>
 
     <div class="metrics">
         <div class="card"><div class="label">Total Distance</div><div class="value" id="totalDistance">-- km</div></div>
-        <div class="card"><div class="label">Total Fuel Saved</div><div class="value" id="fuelSaved">-- L</div></div>
-        <div class="card"><div class="label">Total Cost Saved</div><div class="value" id="costSaved">-- ₹</div></div>
+        <div class="card"><div class="label">Fuel Saved</div><div class="value" id="fuelSaved">-- L</div></div>
+        <div class="card"><div class="label">Cost Saved</div><div class="value" id="costSaved">-- ₹</div></div>
         <div class="card"><div class="label">Max ETA</div><div class="value" id="eta">-- hrs</div></div>
+        <div class="card"><div class="label">Route Improvement</div><div class="value" id="improvement">-- %</div></div>
     </div>
 </div>
 
@@ -134,114 +161,118 @@
 let map = L.map('map').setView([28.6139, 77.2090], 11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-let warehouseMarker, trucks = [], polylines = [], stopMarkers = [];
-let animationInterval = null;
+let trucks = [], polylines = [], stopMarkers = [];
+let warehouseMarker = null;
+let animation = null;
 
-async function getRealRoute(coords) {
-    const pointsStr = coords.map(c => `${c[1]},${c[0]}`).join(';');
-    try {
-        const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${pointsStr}?overview=full&geometries=geojson`);
-        const data = await res.json();
-        if (data.routes && data.routes[0]) {
-            return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-        }
-    } catch(e) {}
-    return coords;
-}
+const warehouseIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/3059/3059518.png",
+    iconSize: [45,45]
+});
+
+const truckIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/1995/1995520.png",
+    iconSize: [40,40]
+});
+
+const stopIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/854/854878.png",
+    iconSize: [28,28]
+});
 
 async function optimizeRoute() {
-    const input = document.getElementById("locationsInput").value.trim();
-    const lines = input.split("\n");
-    const locations = [];
-
-    for (let line of lines) {
-        const [lat, lng] = line.trim().split(",").map(x => parseFloat(x.trim()));
-        if (!isNaN(lat) && !isNaN(lng)) locations.push([lat, lng]);
-    }
-
-    const numTrucks = parseInt(document.getElementById("numTrucks").value);
-
-    if (locations.length < numTrucks) {
-        alert(`Please enter at least ${numTrucks} delivery points for ${numTrucks} trucks!`);
-        return;
-    }
 
     document.getElementById("loadingOverlay").style.display = "flex";
 
-    const res = await fetch('/optimize-route', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ 
-            locations: locations,
-            num_trucks: numTrucks 
-        })
+    const lines = document.getElementById("locationsInput").value.split("\n");
+    const locations = [];
+
+    for (let l of lines) {
+        const [lat, lng] = l.split(",").map(x => parseFloat(x.trim()));
+        if (!isNaN(lat)) locations.push([lat, lng]);
+    }
+
+    const num = parseInt(document.getElementById("numTrucks").value);
+
+    const res = await fetch("/optimize-route", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({locations:locations, num_trucks:num})
     });
 
     const data = await res.json();
     document.getElementById("loadingOverlay").style.display = "none";
 
-    if (data.error) {
-        alert(data.error);
-        return;
-    }
-
-    // Update metrics
-    document.getElementById("totalDistance").textContent = data.trucks.reduce((sum, t) => sum + t.metrics.optimized_distance, 0).toFixed(1) + " km";
-    document.getElementById("fuelSaved").textContent = data.trucks.reduce((sum, t) => sum + t.metrics.fuel_saved_litres, 0).toFixed(2) + " L";
+    document.getElementById("totalDistance").textContent = data.comparison.optimized_total + " km";
+    document.getElementById("fuelSaved").textContent = (data.comparison.optimized_total * 0.2).toFixed(2) + " L";
     document.getElementById("costSaved").textContent = "₹" + data.total_cost_saved_inr;
     document.getElementById("eta").textContent = data.total_eta_hours + " hrs";
+    document.getElementById("improvement").textContent = data.comparison.improvement_percent + " %";
 
-    // Clear old layers
-    if (warehouseMarker) map.removeLayer(warehouseMarker);
-    trucks.forEach(t => map.removeLayer(t.marker || t));
-    stopMarkers.forEach(m => map.removeLayer(m));
     polylines.forEach(p => map.removeLayer(p));
-    if (animationInterval) clearInterval(animationInterval);
+    stopMarkers.forEach(m => map.removeLayer(m));
+    if (warehouseMarker) map.removeLayer(warehouseMarker);
+    if(animation) cancelAnimationFrame(animation);
 
-    warehouseMarker = L.marker(data.warehouse, {
-        icon: L.icon({iconUrl: "https://cdn-icons-png.flaticon.com/512/3059/3059518.png", iconSize: [52,52]})
-    }).addTo(map).bindTooltip("🏭 Warehouse", {permanent: true});
-
-    const colors = ["#06b6d4", "#f97316", "#a78bfa", "#fbbf24"];
-
+    const colors = ["#06b6d4","#f97316","#a78bfa","#fbbf24"];
     trucks = [];
-    for (let truck of data.trucks) {
-        const color = colors[truck.truck_id - 1];
-        const realPath = await getRealRoute(truck.route);
 
-        const poly = L.polyline(realPath, { color: color, weight: 6, opacity: 0.9 }).addTo(map);
+    warehouseMarker = L.marker(data.warehouse, {icon: warehouseIcon})
+        .addTo(map)
+        .bindTooltip("🏭 Warehouse", {permanent:true});
+
+    for (let truck of data.trucks) {
+
+        const path = truck.geometry.map(c => [c[1], c[0]]);
+
+        const poly = L.polyline(path, {
+            color: colors[truck.truck_id-1],
+            weight: 6
+        }).addTo(map).bindTooltip("Truck " + truck.truck_id + " Route");
+
         polylines.push(poly);
 
-        const truckMarker = L.marker(realPath[0], {
-            icon: L.icon({iconUrl: "https://cdn-icons-png.flaticon.com/512/1995/1995520.png", iconSize: [46,46]})
-        }).addTo(map).bindTooltip(`Truck ${truck.truck_id}`, {permanent: true});
+        const marker = L.marker(path[0], {icon: truckIcon})
+            .addTo(map)
+            .bindTooltip("🚚 Truck " + truck.truck_id, {permanent:true});
 
-        trucks.push({marker: truckMarker, path: realPath, color: color});
+        trucks.push({marker:marker, path:path});
 
-        // Delivery stops
         truck.route.forEach((point, idx) => {
             if (idx > 0) {
-                L.marker(point, {
-                    icon: L.icon({iconUrl: "https://cdn-icons-png.flaticon.com/512/854/854878.png", iconSize: [30,30]})
-                }).addTo(map).bindPopup(`Stop ${idx} - Truck ${truck.truck_id}`);
+                const m = L.marker(point, {icon: stopIcon})
+                    .addTo(map)
+                    .bindPopup("📍 Delivery Point");
+
+                stopMarkers.push(m);
             }
         });
     }
 
-    // Animate all trucks
     let step = 0;
-    animationInterval = setInterval(() => {
-        step++;
-        trucks.forEach(t => {
-            if (step < t.path.length) t.marker.setLatLng(t.path[step]);
+
+    function animate() {
+        step += 0.3;
+
+        trucks.forEach(t=>{
+            const i = Math.floor(step);
+            if(i < t.path.length){
+                const p1 = t.path[i];
+                const p2 = t.path[i+1] || p1;
+
+                const lat = p1[0] + (p2[0]-p1[0])*(step-i);
+                const lng = p1[1] + (p2[1]-p1[1])*(step-i);
+
+                t.marker.setLatLng([lat, lng]);
+            }
         });
-    }, 280);
 
-    map.fitBounds([data.warehouse, ...locations], { padding: [60, 60] });
+        animation = requestAnimationFrame(animate);
+    }
+
+    animate();
 }
-
-// Auto load with default points
-window.onload = () => optimizeRoute();
 </script>
+
 </body>
 </html>
