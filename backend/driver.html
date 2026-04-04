@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Driver App</title>
+
+    <!-- ✅ PWA META -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="description" content="Fleet Driver App for real-time tracking and route optimization">
+
+    <!-- ✅ MANIFEST (FIXED) -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- ✅ ICON (IMPORTANT FOR PWA BUILDER) -->
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/1995/1995520.png">
+
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: white;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+
+        .topbar {
+            position: absolute;
+            top: 0;
+            width: 100%;
+            background: rgba(15,23,42,0.95);
+            padding: 12px;
+            text-align: center;
+            z-index: 1000;
+            font-weight: bold;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: rgba(15,23,42,0.95);
+            padding: 15px;
+            z-index: 1000;
+            border-top-left-radius: 15px;
+            border-top-right-radius: 15px;
+        }
+
+        select, button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 10px;
+            border-radius: 10px;
+            border: none;
+            font-size: 16px;
+        }
+
+        button {
+            background: linear-gradient(90deg,#6366f1,#a5b4fc);
+            color: black;
+            font-weight: bold;
+        }
+
+        .status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #38bdf8;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="topbar">🚚 Driver App</div>
+
+<div id="map"></div>
+
+<div class="controls">
+
+    <select id="vehicleSelect">
+        <option value="">Select Vehicle</option>
+        {% for v in vehicles %}
+        <option value="{{ v.id }}">{{ v.vehicle_name }}</option>
+        {% endfor %}
+    </select>
+
+    <button onclick="startTracking()">▶ Start Ride</button>
+    <button onclick="stopTracking()">⏹ Stop Ride</button>
+
+    <div class="status" id="status">Status: Idle</div>
+</div>
+
+<script>
+let map = L.map('map').setView([28.6139,77.2090],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+let marker=null;
+let socket=null;
+let watchId=null;
+let routeLines=[];
+
+// ICONS
+const warehouseIcon = L.icon({
+    iconUrl:"https://cdn-icons-png.flaticon.com/512/3059/3059518.png",
+    iconSize:[40,40]
+});
+
+const stopIcon = L.icon({
+    iconUrl:"https://cdn-icons-png.flaticon.com/512/854/854878.png",
+    iconSize:[25,25]
+});
+
+// LOAD ROUTE
+async function loadRoute(){
+    routeLines.forEach(r=>map.removeLayer(r));
+    routeLines=[];
+
+    const res = await fetch("/optimize-route",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            locations:[
+                [28.7041,77.1025],
+                [28.5355,77.3910],
+                [28.4595,77.0266],
+                [28.6692,77.4538]
+            ],
+            num_trucks:1
+        })
+    });
+
+    const data = await res.json();
+
+    L.marker(data.warehouse,{icon:warehouseIcon}).addTo(map);
+
+    data.trucks.forEach(t=>{
+        const path=t.geometry.map(c=>[c[1],c[0]]);
+        const poly=L.polyline(path,{color:"#06b6d4",weight:5}).addTo(map);
+        routeLines.push(poly);
+
+        t.route.forEach((p,i)=>{
+            if(i>0){
+                L.marker(p,{icon:stopIcon}).addTo(map);
+            }
+        });
+    });
+}
+
+// SMOOTH MOVE
+function moveSmooth(lat,lng){
+    if(!marker){
+        marker=L.marker([lat,lng]).addTo(map);
+        return;
+    }
+
+    const start=marker.getLatLng();
+    let i=0;
+    const steps=15;
+
+    const interval=setInterval(()=>{
+        i++;
+        const newLat=start.lat+(lat-start.lat)*(i/steps);
+        const newLng=start.lng+(lng-start.lng)*(i/steps);
+
+        marker.setLatLng([newLat,newLng]);
+
+        if(i>=steps) clearInterval(interval);
+    },80);
+}
+
+function startTracking(){
+
+    const vehicleId=document.getElementById("vehicleSelect").value;
+    if(!vehicleId){
+        alert("Select vehicle");
+        return;
+    }
+
+    document.getElementById("status").textContent="Status: Starting...";
+
+    loadRoute();
+
+    const protocol=location.protocol==="https:"?"wss":"ws";
+    socket=new WebSocket(`${protocol}://${location.host}/ws/driver/${vehicleId}`);
+
+    socket.onopen=()=>{
+        document.getElementById("status").textContent="Status: Live";
+
+        watchId=navigator.geolocation.watchPosition(
+            (pos)=>{
+                const lat=pos.coords.latitude;
+                const lng=pos.coords.longitude;
+
+                moveSmooth(lat,lng);
+                socket.send(JSON.stringify({lat,lng}));
+
+                map.setView([lat,lng],15);
+            },
+            (err)=>{
+                alert("GPS Error");
+            },
+            {enableHighAccuracy:true}
+        );
+    };
+}
+
+function stopTracking(){
+    if(watchId) navigator.geolocation.clearWatch(watchId);
+    if(socket) socket.close();
+
+    document.getElementById("status").textContent="Status: Stopped";
+}
+</script>
+
+</body>
+</html>
