@@ -2,161 +2,477 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Fleet Driver App | Live Tracking</title>
-
+    <title>FleetAI | Driver App</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#000000">
+    <meta name="theme-color" content="#09090b">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="FleetAI Driver">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; font-family: 'Helvetica Neue', sans-serif; }
-        body { background: #000; color: #FFF; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        #map { flex: 1; width: 100%; z-index: 1; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-        .top-ui {
-            position: absolute; top: 0; width: 100%;
-            background: linear-gradient(180deg, rgba(0,0,0,0.95) 0%, transparent 100%);
-            padding: 15px 20px; z-index: 1000; display: flex; justify-content: space-between; align-items: center;
-        }
-        .status-pill { display: flex; align-items: center; font-size: 12px; color: #A0A0A0; padding: 5px 12px; background: rgba(0,0,0,0.5); border-radius: 20px; border: 1px solid #333; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; margin-right: 8px; }
-        .live .status-dot { background: #05A357; box-shadow: 0 0 10px #05A357; }
-        .live { color: #FFF; border-color: #05A357; }
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+        html, body { height:100%; overflow:hidden; background:#09090b; }
 
-        .bottom-ui {
-            position: absolute; bottom: 0; width: 100%; background: rgba(18,18,18,0.98); padding: 20px;
-            z-index: 1000; border-top: 1px solid #262626; border-radius: 15px 15px 0 0;
+        :root {
+            --bg:      #09090b;
+            --bg2:     #111113;
+            --bg3:     #18181b;
+            --border:  #27272a;
+            --text:    #fafafa;
+            --muted:   #71717a;
+            --blue:    #3b82f6;
+            --green:   #22c55e;
+            --red:     #ef4444;
+            --amber:   #f59e0b;
         }
-        select { width: 100%; padding: 15px; background: #000; border: 1px solid #333; color: #FFF; border-radius: 10px; margin-bottom: 15px; font-size: 16px; }
-        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; text-transform: uppercase; }
-        .btn-start { background: #FFF; color: #000; }
-        .btn-stop { background: #000; color: #FF4444; border: 2px solid #FF4444; display: none; }
 
-        /* Geofence Alert Toast */
-        #geofenceAlert {
-            position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
-            background: #05A357; color: white; padding: 10px 20px; border-radius: 30px;
-            font-weight: 600; z-index: 2000; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        body { font-family:'Inter',sans-serif; color:var(--text); display:flex; flex-direction:column; }
+
+        /* ── STATUS BAR ── */
+        .status-bar {
+            background:#000; padding:8px 18px;
+            display:flex; justify-content:space-between; align-items:center;
+            font-size:11px; font-weight:600; flex-shrink:0;
         }
+        .gps-pill { display:flex; align-items:center; gap:5px; color:var(--green); }
+        .gps-dot { width:6px; height:6px; border-radius:50%; background:var(--green); }
+        .gps-dot.blink { animation:blink 1.5s infinite; }
+        .gps-dot.off { background:var(--muted); animation:none; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+        /* ── HEADER ── */
+        .app-header {
+            background:linear-gradient(180deg,#000 0%,#09090b 100%);
+            padding:14px 18px 18px; flex-shrink:0; border-bottom:1px solid var(--border);
+        }
+        .header-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+        .brand { font-size:18px; font-weight:800; letter-spacing:-.5px; }
+        .brand em { font-style:normal; color:var(--blue); }
+        .conn-badge { display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600; border-radius:20px; padding:4px 10px; border:1px solid; }
+        .conn-badge.connected    { color:var(--green); border-color:rgba(34,197,94,.3); background:rgba(34,197,94,.08); }
+        .conn-badge.disconnected { color:var(--muted); border-color:var(--border); background:var(--bg3); }
+        .conn-badge.tracking     { color:var(--blue);  border-color:rgba(59,130,246,.3); background:rgba(59,130,246,.08); }
+        .conn-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+        .conn-dot.tracking { animation:blink 1s infinite; }
+        .header-sub { font-size:12px; color:var(--muted); }
+
+        /* ── SELECT ── */
+        .select-wrap { padding:14px 18px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; }
+        .select-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:8px; }
+        select {
+            width:100%; padding:13px 16px; background:var(--bg3); border:1px solid var(--border);
+            color:var(--text); font-size:15px; font-family:'Inter',sans-serif;
+            border-radius:10px; appearance:none; outline:none; cursor:pointer;
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2371717a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat:no-repeat; background-position:right 14px center;
+            transition:.15s;
+        }
+        select:focus { border-color:var(--blue); }
+        select option { background:var(--bg3); }
+
+        /* ── MAP ── */
+        #map { flex-shrink:0; height:200px; }
+        .leaflet-container { background:#09090b !important; }
+
+        /* ── GPS INFO ── */
+        .gps-info {
+            background:var(--bg2); border-bottom:1px solid var(--border);
+            padding:7px 18px; display:flex; align-items:center; gap:8px;
+            font-size:11px; color:var(--muted); flex-shrink:0;
+        }
+        #coordsText { font-family:'JetBrains Mono',monospace; font-size:11px; }
+
+        /* ── SCROLL AREA ── */
+        .scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        .scroll::-webkit-scrollbar { display:none; }
+
+        /* ── CHIPS ── */
+        .chips { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:14px; }
+        .chip {
+            background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+            padding:12px 10px; text-align:center; transition:.15s;
+        }
+        .chip.highlight { border-color:rgba(59,130,246,.4); background:rgba(59,130,246,.06); }
+        .chip-val { font-size:18px; font-weight:700; font-family:'JetBrains Mono',monospace; }
+        .chip-lbl { font-size:10px; color:var(--muted); margin-top:3px; font-weight:500; text-transform:uppercase; letter-spacing:.4px; }
+
+        /* ── STOPS ── */
+        .stops-section { padding:0 14px 14px; display:flex; flex-direction:column; gap:8px; }
+        .section-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:4px; }
+
+        .stop {
+            background:var(--bg2); border:1px solid var(--border);
+            border-radius:12px; padding:14px; display:flex; align-items:flex-start; gap:12px;
+            transition:all .2s;
+        }
+        .stop.done    { opacity:.5; }
+        .stop.active  { border-color:rgba(59,130,246,.5); background:rgba(59,130,246,.06); }
+        .stop.pending { opacity:.6; }
+
+        .stop-num {
+            width:28px; height:28px; border-radius:50%; display:flex;
+            align-items:center; justify-content:center; font-size:11px; font-weight:700;
+            flex-shrink:0; margin-top:1px;
+        }
+        .num-done    { background:rgba(34,197,94,.15); color:var(--green); }
+        .num-active  { background:var(--blue); color:#fff; }
+        .num-pending { background:var(--bg3); color:var(--muted); border:1px solid var(--border); }
+
+        .stop-body { flex:1; min-width:0; }
+        .stop-name { font-size:13px; font-weight:600; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .stop-addr { font-size:11px; color:var(--muted); }
+        .stop-meta { font-size:11px; margin-top:5px; display:flex; align-items:center; gap:6px; }
+        .stop-meta.green { color:var(--green); font-weight:600; }
+        .stop-meta.blue  { color:var(--blue);  font-weight:500; }
+        .stop-meta.muted { color:var(--muted); }
+
+        /* ── GEOFENCE TOAST ── */
+        #geoToast {
+            position:fixed; top:70px; left:50%; transform:translateX(-50%) translateY(-12px);
+            background:var(--green); color:#fff; padding:10px 20px; border-radius:24px;
+            font-size:13px; font-weight:700; z-index:9999; display:none;
+            box-shadow:0 4px 20px rgba(34,197,94,.4); white-space:nowrap;
+            transition:all .3s;
+        }
+        #geoToast.show { display:block; transform:translateX(-50%) translateY(0); }
+
+        /* ── BOTTOM BUTTONS ── */
+        .bottom-bar {
+            background:var(--bg2); border-top:1px solid var(--border);
+            padding:12px 14px; display:flex; gap:10px; flex-shrink:0;
+        }
+        .btn {
+            flex:1; border:none; border-radius:12px; padding:15px;
+            font-size:14px; font-weight:700; font-family:'Inter',sans-serif;
+            cursor:pointer; transition:all .15s; letter-spacing:-.2px;
+        }
+        .btn:active { transform:scale(.97); }
+        .btn-start { background:#fff; color:#000; }
+        .btn-start:hover { background:#e5e7eb; }
+        .btn-stop  { background:var(--bg3); color:var(--red); border:2px solid rgba(239,68,68,.3); display:none; }
+        .btn-stop:hover { border-color:var(--red); background:rgba(239,68,68,.08); }
+        .btn-nav   { background:var(--bg3); color:var(--blue); border:1px solid rgba(59,130,246,.3); flex:0 0 auto; width:52px; padding:0; display:flex; align-items:center; justify-content:center; font-size:20px; }
+        .btn-nav:hover { background:rgba(59,130,246,.08); }
     </style>
 </head>
 <body>
 
-<div id="geofenceAlert">📍 Destination Reached!</div>
+<div id="geoToast">📍 Destination Reached!</div>
 
-<div class="top-ui">
-    <div style="font-weight:800;">Fleet<span style="color:#276EF1;">AI</span> Dispatch</div>
-    <div class="status-pill" id="statusPill"><div class="status-dot"></div> <span id="statusText">Disconnected</span></div>
+<!-- STATUS BAR -->
+<div class="status-bar">
+    <span id="clockText">--:--</span>
+    <div class="gps-pill" id="gpsPill">
+        <div class="gps-dot off" id="gpsDot"></div>
+        <span id="gpsText">GPS Off</span>
+    </div>
 </div>
 
-<div id="map"></div>
+<!-- HEADER -->
+<div class="app-header">
+    <div class="header-top">
+        <div class="brand">Fleet<em>AI</em> Dispatch</div>
+        <div class="conn-badge disconnected" id="connBadge">
+            <div class="conn-dot" id="connDot"></div>
+            <span id="connText">Disconnected</span>
+        </div>
+    </div>
+    <div class="header-sub">Real-time fleet tracking · K.R Mangalam University</div>
+</div>
 
-<div class="bottom-ui">
+<!-- VEHICLE SELECT -->
+<div class="select-wrap">
+    <div class="select-label">Select your vehicle</div>
     <select id="vehicleSelect">
-        <option value="">Select Vehicle</option>
+        <option value="">— Choose Vehicle —</option>
         {% for v in vehicles %}
-        <option value="{{ v.id }}">{{ v.vehicle_name }}</option>
+        <option value="{{ v.id }}">{{ v.vehicle_name }}{% if v.driver_name %} · {{ v.driver_name }}{% endif %}</option>
         {% endfor %}
     </select>
-    <button id="startBtn" class="btn btn-start" onclick="startRide()">Start Dispatch</button>
-    <button id="stopBtn" class="btn btn-stop" onclick="stopRide()">End Ride</button>
+</div>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- GPS INFO -->
+<div class="gps-info">
+    <div class="gps-dot off" id="coordDot"></div>
+    <span id="coordsText">Location not acquired yet</span>
+</div>
+
+<!-- SCROLL AREA -->
+<div class="scroll">
+
+    <!-- CHIPS -->
+    <div class="chips">
+        <div class="chip" id="stopsChip">
+            <div class="chip-val" id="stopsVal">—</div>
+            <div class="chip-lbl">Stops Left</div>
+        </div>
+        <div class="chip highlight" id="distChip">
+            <div class="chip-val" id="distVal">—</div>
+            <div class="chip-lbl">Distance</div>
+        </div>
+        <div class="chip" id="speedChip">
+            <div class="chip-val" id="speedVal">0</div>
+            <div class="chip-lbl">km/h</div>
+        </div>
+    </div>
+
+    <!-- STOPS LIST -->
+    <div class="stops-section">
+        <div class="section-label" id="stopsLabel">Route Stops</div>
+        <div id="stopsList">
+            <div style="text-align:center;color:var(--muted);padding:32px 0;font-size:13px">
+                Select a vehicle and tap <strong style="color:var(--text)">Start Dispatch</strong> to load route
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- BOTTOM BUTTONS -->
+<div class="bottom-bar">
+    <button class="btn btn-start" id="btnStart" onclick="startRide()">Start Dispatch</button>
+    <button class="btn btn-stop"  id="btnStop"  onclick="stopRide()">End Ride</button>
+    <button class="btn btn-nav"   id="btnNav"   onclick="openNav()" title="Navigate">🧭</button>
 </div>
 
 <script>
-    let map = L.map('map', { zoomControl: false }).setView([28.6139, 77.2090], 14);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+// ── CLOCK ──
+function updateClock() {
+    const now = new Date();
+    document.getElementById('clockText').textContent =
+        now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+}
+setInterval(updateClock, 10000);
+updateClock();
 
-    let marker, socket, watchId;
-    let deliveryPoints = []; 
-    let routePoints = []; // To store coordinates of stops
+// ── MAP ──
+const map = L.map('map', { zoomControl:false })
+    .setView([28.6139, 77.2090], 13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-    // Helper: Calculate distance between two points in KM
-    function getDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371; // Earth radius in km
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+// ── STATE ──
+let socket = null, watchId = null;
+let driverMarker = null, routePolyline = null;
+let deliveryPoints = [];
+let currentLat = null, currentLng = null;
+
+const driverIcon = L.divIcon({
+    className:'',
+    html:`<div style="width:20px;height:20px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 14px #3b82f655,0 2px 8px rgba(0,0,0,.4);"></div>`,
+    iconSize:[20,20], iconAnchor:[10,10]
+});
+const stopIcon = (color='#fff') => L.divIcon({
+    className:'',
+    html:`<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 8px ${color}88;"></div>`,
+    iconSize:[10,10], iconAnchor:[5,5]
+});
+
+// ── DISTANCE HELPER ──
+function getDistance(lat1,lon1,lat2,lon2) {
+    const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+    const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ── RENDER STOPS ──
+function renderStops(points) {
+    const list = document.getElementById('stopsList');
+    if (!points.length) { list.innerHTML='<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px">No stops assigned</div>'; return; }
+
+    const pending = points.filter(p => !p.reached).length;
+    document.getElementById('stopsVal').textContent = pending;
+
+    list.innerHTML = points.map((p, i) => {
+        const cls = p.reached ? 'done' : (i === points.findIndex(x=>!x.reached) ? 'active' : 'pending');
+        const numCls = p.reached ? 'num-done' : (cls==='active' ? 'num-active' : 'num-pending');
+        const numTxt = p.reached ? '✓' : (i+1);
+
+        let metaHtml = '';
+        if (p.reached) metaHtml = `<div class="stop-meta green">✓ Reached</div>`;
+        else if (cls==='active') metaHtml = `<div class="stop-meta blue">→ Next stop</div>`;
+        else metaHtml = `<div class="stop-meta muted">Upcoming</div>`;
+
+        return `<div class="stop ${cls}">
+            <div class="stop-num ${numCls}">${numTxt}</div>
+            <div class="stop-body">
+                <div class="stop-name">Stop ${i+1}</div>
+                <div class="stop-addr">${p.coords[0].toFixed(4)}, ${p.coords[1].toFixed(4)}</div>
+                ${metaHtml}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── OPEN NAVIGATION ──
+function openNav() {
+    if (currentLat && deliveryPoints.length) {
+        const next = deliveryPoints.find(p => !p.reached);
+        if (next) {
+            window.open(`https://www.google.com/maps/dir/?api=1&origin=${currentLat},${currentLng}&destination=${next.coords[0]},${next.coords[1]}&travelmode=driving`,'_blank');
+            return;
+        }
     }
+    alert('Start dispatch first to get navigation!');
+}
 
-    async function startRide() {
-        const vId = document.getElementById("vehicleSelect").value;
-        if(!vId) return alert("Select vehicle!");
+// ── START RIDE ──
+async function startRide() {
+    const vId = document.getElementById('vehicleSelect').value;
+    if (!vId) { alert('Please select a vehicle first!'); return; }
 
-        // 1. Fetch Optimized Route
-        const res = await fetch("/optimize-route", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ locations: [[28.6139, 77.2090], [28.62, 77.22], [28.60, 77.23]], num_trucks: 1 })
+    document.getElementById('btnStart').textContent = 'Loading route…';
+    document.getElementById('btnStart').style.opacity = '0.6';
+
+    try {
+        // Fetch optimized route from your exact endpoint
+        const res = await fetch('/optimize-route', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                locations: [[28.6139,77.2090],[28.62,77.22],[28.60,77.23]],
+                num_trucks: 1
+            })
         });
         const data = await res.json();
-        
-        // Save delivery stops for Geofencing
-        routePoints = data.trucks[0].route;
 
-        // Draw Route & Markers
-        const path = data.trucks[0].geometry.map(c => [c[1], c[0]]);
-        L.polyline(path, {color: "#00FFFF", weight: 5}).addTo(map);
-        
+        const routePoints = data.trucks[0].route;
+
+        // Draw polyline
+        if (routePolyline) map.removeLayer(routePolyline);
+        const pathCoords = data.trucks[0].geometry.map(c => [c[1],c[0]]);
+        routePolyline = L.polyline(pathCoords, { color:'#00e5ff', weight:4, opacity:.75 }).addTo(map);
+
+        // Setup delivery points & stop markers
+        deliveryPoints = [];
         routePoints.forEach((p, i) => {
-            const stopMarker = L.circleMarker(p, {
-                radius: 8, color: '#FFF', fillColor: '#FFF', fillOpacity: 0.8
-            }).addTo(map).bindTooltip("Stop " + i);
-            deliveryPoints.push({ coords: p, marker: stopMarker, reached: false });
+            const marker = L.marker(p, { icon: stopIcon('#ffffff'), zIndexOffset:100 }).addTo(map);
+            deliveryPoints.push({ coords:p, marker, reached:false });
         });
 
-        // 2. Start WebSocket & GPS
-        const protocol = location.protocol === "https:" ? "wss" : "ws";
-        socket = new WebSocket(`${protocol}://${location.host}/ws/driver/${vId}`);
+        renderStops(deliveryPoints);
 
-        watchId = navigator.geolocation.watchPosition((pos) => {
-            const { latitude, longitude } = pos.coords;
-            
-            // Update Marker
-            if(!marker) {
-                marker = L.marker([latitude, longitude]).addTo(map);
-            } else {
-                marker.setLatLng([latitude, longitude]);
-            }
-            map.setView([latitude, longitude]);
+        // Fit map
+        map.fitBounds(routePolyline.getBounds(), { padding:[30,30] });
 
-            // ✅ GEOFENCING LOGIC
-            deliveryPoints.forEach(point => {
-                const dist = getDistance(latitude, longitude, point.coords[0], point.coords[1]);
-                if (dist < 0.05 && !point.reached) { // 50 meters range
-                    point.reached = true;
-                    point.marker.setStyle({color: '#05A357', fillColor: '#05A357'}); // Turn Green
-                    
-                    // Show Toast Alert
-                    const toast = document.getElementById("geofenceAlert");
-                    toast.style.display = "block";
-                    setTimeout(() => toast.style.display = "none", 3000);
-                    
-                    // Notify Server
-                    socket.send(JSON.stringify({event: "geofence_arrival", lat: latitude, lng: longitude}));
+        // ── WEBSOCKET (your exact endpoint) ──
+        const proto = location.protocol==='https:' ? 'wss' : 'ws';
+        socket = new WebSocket(`${proto}://${location.host}/ws/driver/${vId}`);
+
+        socket.onopen = () => {
+            setConn('tracking', `Truck ${vId} — Live`);
+        };
+        socket.onerror = () => setConn('disconnected', 'Connection error');
+        socket.onclose = () => setConn('disconnected', 'Disconnected');
+
+        // ── GPS WATCH ──
+        watchId = navigator.geolocation.watchPosition(
+            pos => {
+                const { latitude:lat, longitude:lng, speed } = pos.coords;
+                currentLat = lat; currentLng = lng;
+
+                // Update GPS info bar
+                const dot = document.getElementById('coordDot');
+                dot.className = 'gps-dot blink';
+                dot.style.background = 'var(--green)';
+                document.getElementById('gpsDot').className = 'gps-dot blink';
+                document.getElementById('gpsText').textContent = 'GPS Active';
+                document.getElementById('coordsText').textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+                // Speed chip
+                const kmh = speed ? Math.round(speed * 3.6) : 0;
+                document.getElementById('speedVal').textContent = kmh;
+
+                // Update driver marker
+                if (!driverMarker) {
+                    driverMarker = L.marker([lat,lng], { icon:driverIcon, zIndexOffset:1000 }).addTo(map);
+                } else {
+                    driverMarker.setLatLng([lat,lng]);
                 }
-            });
 
-            if(socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({lat: latitude, lng: longitude}));
-            }
-        }, err => console.error(err), { enableHighAccuracy: true });
+                // ── GEOFENCING (your exact logic) ──
+                deliveryPoints.forEach(point => {
+                    const dist = getDistance(lat, lng, point.coords[0], point.coords[1]);
+                    if (dist < 0.05 && !point.reached) {
+                        point.reached = true;
+                        point.marker.setStyle
+                            ? point.marker.setStyle({ fillColor:'#22c55e', color:'#22c55e' })
+                            : null;
 
-        // UI Updates
-        document.getElementById("startBtn").style.display = "none";
-        document.getElementById("stopBtn").style.display = "block";
-        document.getElementById("statusPill").classList.add("live");
-        document.getElementById("statusText").innerText = "Live tracking";
+                        // Remove old marker, add green one
+                        map.removeLayer(point.marker);
+                        point.marker = L.marker(point.coords, { icon: stopIcon('#22c55e') }).addTo(map);
+
+                        // Toast
+                        const toast = document.getElementById('geoToast');
+                        toast.classList.add('show');
+                        setTimeout(() => toast.classList.remove('show'), 3000);
+
+                        // Notify server (your exact payload)
+                        if (socket && socket.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({ event:'geofence_arrival', lat, lng }));
+                        }
+
+                        renderStops(deliveryPoints);
+                    }
+                });
+
+                // Send location to server (your exact payload)
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({ lat, lng }));
+                }
+
+                // Distance estimate
+                const next = deliveryPoints.find(p => !p.reached);
+                if (next) {
+                    const d = getDistance(lat, lng, next.coords[0], next.coords[1]);
+                    document.getElementById('distVal').textContent = d.toFixed(1) + ' km';
+                } else {
+                    document.getElementById('distVal').textContent = '0 km';
+                }
+            },
+            err => {
+                console.error('GPS error:', err);
+                document.getElementById('gpsText').textContent = 'GPS Error';
+                document.getElementById('coordsText').textContent = 'Location permission denied';
+            },
+            { enableHighAccuracy:true, maximumAge:3000, timeout:10000 }
+        );
+
+        // Swap buttons
+        document.getElementById('btnStart').style.display = 'none';
+        document.getElementById('btnStop').style.display  = 'flex';
+
+    } catch (err) {
+        console.error('Start ride error:', err);
+        document.getElementById('btnStart').textContent = 'Start Dispatch';
+        document.getElementById('btnStart').style.opacity = '1';
+        alert('Failed to load route. Is the server running?');
     }
+}
 
-    function stopRide() {
-        if(watchId) navigator.geolocation.clearWatch(watchId);
-        if(socket) socket.close();
-        location.reload();
-    }
+// ── STOP RIDE ──
+function stopRide() {
+    if (watchId)  navigator.geolocation.clearWatch(watchId);
+    if (socket)   socket.close();
+    location.reload();
+}
+
+// ── CONNECTION BADGE ──
+function setConn(state, label) {
+    const badge = document.getElementById('connBadge');
+    const dot   = document.getElementById('connDot');
+    badge.className = `conn-badge ${state}`;
+    dot.className   = `conn-dot${state==='tracking' ? ' tracking' : ''}`;
+    document.getElementById('connText').textContent = label;
+}
 </script>
 </body>
 </html>
