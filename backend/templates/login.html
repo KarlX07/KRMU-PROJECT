@@ -1,88 +1,225 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Fleet Intelligence - Login</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FleetAI | Login</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         * { margin:0; padding:0; box-sizing:border-box; }
+        html, body { height:100%; }
+        :root {
+            --bg:#09090b; --bg2:#111113; --bg3:#18181b;
+            --border:#27272a; --text:#fafafa; --muted:#71717a;
+            --blue:#3b82f6; --green:#22c55e; --red:#ef4444;
+        }
         body {
-            font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #0f172a, #1e1b4b);
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
+            font-family:'Inter',sans-serif; background:var(--bg); color:var(--text);
+            display:flex; align-items:center; justify-content:center;
+            min-height:100vh; position:relative; overflow:hidden;
         }
-        .login-box {
-            background: rgba(15,23,42,0.95);
-            padding: 40px 35px;
-            border-radius: 16px;
-            width: 380px;
-            border: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        /* Grid background */
+        body::before {
+            content:''; position:absolute; inset:0;
+            background-image: linear-gradient(rgba(59,130,246,.03) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(59,130,246,.03) 1px, transparent 1px);
+            background-size:40px 40px; pointer-events:none;
         }
-        .login-box h1 {
-            color: #818cf8;
-            margin-bottom: 10px;
-            font-size: 28px;
+        /* Blue glow top */
+        body::after {
+            content:''; position:absolute; top:-200px; left:50%; transform:translateX(-50%);
+            width:600px; height:600px;
+            background:radial-gradient(circle, rgba(59,130,246,.07) 0%, transparent 70%);
+            pointer-events:none;
         }
-        .login-box p { color: #64748b; margin-bottom: 30px; }
-        input {
-            width: 100%;
-            padding: 14px;
-            margin: 10px 0;
-            border-radius: 8px;
-            border: 1px solid #475569;
-            background: #1e2937;
-            color: white;
-            font-size: 15px;
+        .card {
+            background:var(--bg2); border:1px solid var(--border); border-radius:16px;
+            padding:40px; width:100%; max-width:400px; position:relative; z-index:1;
+            box-shadow:0 24px 64px rgba(0,0,0,.6);
         }
-        .login-btn {
-            width: 100%;
-            padding: 14px;
-            margin-top: 15px;
-            background: linear-gradient(90deg, #6366f1, #a5b4fc);
-            color: black;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 700;
-            cursor: pointer;
+        /* Logo */
+        .logo { text-align:center; margin-bottom:32px; }
+        .logo-icon {
+            display:inline-flex; align-items:center; justify-content:center;
+            width:52px; height:52px; background:var(--blue); border-radius:14px;
+            font-size:24px; margin-bottom:12px;
+            box-shadow:0 0 24px rgba(59,130,246,.35);
         }
-        .demo { font-size: 13px; color: #94a3b8; margin-top: 20px; }
+        .logo-name { font-size:22px; font-weight:800; letter-spacing:-.5px; }
+        .logo-name em { font-style:normal; color:var(--blue); }
+        .logo-sub { font-size:12px; color:var(--muted); margin-top:4px; }
+        /* Role tabs */
+        .tabs {
+            display:grid; grid-template-columns:1fr 1fr; gap:6px;
+            background:var(--bg3); border:1px solid var(--border);
+            border-radius:10px; padding:4px; margin-bottom:28px;
+        }
+        .tab {
+            padding:9px; border-radius:7px; text-align:center;
+            font-size:13px; font-weight:600; cursor:pointer;
+            color:var(--muted); transition:.2s; user-select:none;
+        }
+        .tab.active {
+            background:var(--bg2); color:var(--text);
+            border:1px solid var(--border); box-shadow:0 2px 8px rgba(0,0,0,.3);
+        }
+        .tab:hover:not(.active) { color:var(--text); }
+        /* Error */
+        .error {
+            background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.25);
+            color:var(--red); border-radius:8px; padding:10px 14px;
+            font-size:13px; font-weight:500; margin-bottom:16px;
+            display:none; align-items:center; gap:8px;
+        }
+        .error.show { display:flex; }
+        /* Form */
+        .label {
+            display:block; font-size:11px; font-weight:600; color:var(--muted);
+            text-transform:uppercase; letter-spacing:.5px; margin-bottom:7px;
+        }
+        .group { margin-bottom:16px; }
+        .input {
+            width:100%; background:var(--bg3); border:1px solid var(--border);
+            color:var(--text); font-size:15px; font-family:'Inter',sans-serif;
+            padding:13px 16px; border-radius:10px; outline:none; transition:.2s;
+        }
+        .input:focus { border-color:var(--blue); box-shadow:0 0 0 3px rgba(59,130,246,.12); }
+        .input::placeholder { color:var(--muted); }
+        .pw-wrap { position:relative; }
+        .pw-eye {
+            position:absolute; right:14px; top:50%; transform:translateY(-50%);
+            background:none; border:none; cursor:pointer; color:var(--muted); font-size:16px;
+        }
+        .pw-eye:hover { color:var(--text); }
+        /* Submit */
+        .btn-login {
+            width:100%; background:var(--blue); color:#fff; border:none;
+            border-radius:10px; padding:15px; font-size:15px; font-weight:700;
+            font-family:'Inter',sans-serif; cursor:pointer; transition:.15s;
+            margin-top:4px; letter-spacing:-.2px;
+        }
+        .btn-login:hover { background:#2563eb; }
+        .btn-login:active { transform:scale(.98); }
+        .btn-login:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+        /* Hint */
+        .hint {
+            margin-top:20px; background:var(--bg3); border:1px solid var(--border);
+            border-radius:10px; padding:14px;
+        }
+        .hint-title { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:8px; }
+        .hint-row { display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px; color:var(--muted); }
+        .hint-row:last-child { margin-bottom:0; }
+        .hint-row span:last-child { color:var(--text); font-family:monospace; }
+        .footer { text-align:center; margin-top:20px; font-size:11px; color:var(--muted); }
     </style>
 </head>
 <body>
+<div class="card">
 
-<div class="login-box">
-    <h1>⚡ Fleet AI</h1>
-    <p>Login to access the system</p>
-
-    <input type="text" id="username" placeholder="Username" value="admin">
-    <input type="password" id="password" placeholder="Password" value="1234">
-
-    <button class="login-btn" onclick="login()">Login Now</button>
-
-    <div class="demo">
-        Demo Credentials:<br>
-        Username: <strong>admin</strong><br>
-        Password: <strong>1234</strong>
+    <div class="logo">
+        <div class="logo-icon">🚚</div>
+        <div class="logo-name">Fleet<em>AI</em></div>
+        <div class="logo-sub">Fleet Intelligence System · K.R Mangalam University</div>
     </div>
+
+    <div class="tabs">
+        <div class="tab active" id="tabAdmin"  onclick="setRole('admin')">🏢 Admin</div>
+        <div class="tab"        id="tabDriver" onclick="setRole('driver')">🚚 Driver</div>
+    </div>
+
+    <div class="error" id="errBox"><span>⚠</span><span id="errText">Invalid credentials</span></div>
+
+    <form onsubmit="doLogin(event)">
+        <input type="hidden" id="roleInput" value="admin">
+        <div class="group">
+            <label class="label">Username</label>
+            <input class="input" type="text" id="uname" placeholder="Enter username" autocomplete="username" required>
+        </div>
+        <div class="group">
+            <label class="label">Password</label>
+            <div class="pw-wrap">
+                <input class="input" type="password" id="pw" placeholder="Enter password" autocomplete="current-password" required>
+                <button type="button" class="pw-eye" onclick="togglePw()">👁</button>
+            </div>
+        </div>
+        <button class="btn-login" type="submit" id="btnLogin">Sign In</button>
+    </form>
+
+    <div class="hint">
+        <div class="hint-title" id="hintTitle">Admin credentials</div>
+        <div class="hint-row"><span>Username</span><span id="hintUser">admin</span></div>
+        <div class="hint-row"><span>Password</span><span id="hintPw">admin123</span></div>
+    </div>
+
+    <div class="footer">Secure · JWT Authentication</div>
 </div>
 
 <script>
-function login() {
-    const user = document.getElementById("username").value;
-    const pass = document.getElementById("password").value;
-
-    if (user === "admin" && pass === "1234") {
-        window.location.href = "/";
-    } else {
-        alert("Wrong credentials! Use admin / 1234");
+    const params = new URLSearchParams(location.search);
+    if (params.get('next')) {
+        const err = document.getElementById('errBox');
+        document.getElementById('errText').textContent = 'Please log in to continue.';
+        err.classList.add('show');
     }
-}
-</script>
 
+    const hints = {
+        admin:  { title:'Admin credentials',  user:'admin',   pw:'admin123'  },
+        driver: { title:'Driver credentials', user:'driver1', pw:'driver123' }
+    };
+
+    function setRole(role) {
+        document.getElementById('roleInput').value = role;
+        document.getElementById('tabAdmin').classList.toggle('active', role === 'admin');
+        document.getElementById('tabDriver').classList.toggle('active', role === 'driver');
+        const h = hints[role];
+        document.getElementById('hintTitle').textContent = h.title;
+        document.getElementById('hintUser').textContent  = h.user;
+        document.getElementById('hintPw').textContent    = h.pw;
+        document.getElementById('errBox').classList.remove('show');
+    }
+
+    function togglePw() {
+        const inp = document.getElementById('pw');
+        const btn = document.querySelector('.pw-eye');
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+    }
+
+    async function doLogin(e) {
+        e.preventDefault();
+        document.getElementById('errBox').classList.remove('show');
+        const btn = document.getElementById('btnLogin');
+        btn.disabled = true;
+        btn.textContent = 'Signing in…';
+
+        try {
+            const res = await fetch('/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: document.getElementById('uname').value.trim(),
+                    password: document.getElementById('pw').value,
+                    role:     document.getElementById('roleInput').value
+                })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                btn.textContent = '✓ Redirecting…';
+                const next = params.get('next');
+                window.location.href = next || (data.role === 'admin' ? '/dashboard' : '/driver');
+            } else {
+                document.getElementById('errText').textContent = data.detail || 'Invalid username or password.';
+                document.getElementById('errBox').classList.add('show');
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        } catch {
+            document.getElementById('errText').textContent = 'Server error. Is the server running?';
+            document.getElementById('errBox').classList.add('show');
+            btn.disabled = false;
+            btn.textContent = 'Sign In';
+        }
+    }
+</script>
 </body>
 </html>
