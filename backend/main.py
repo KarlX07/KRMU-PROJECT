@@ -3,32 +3,98 @@ import os
 import json
 import requests
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from sklearn.cluster import KMeans
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse   # ← RedirectResponse added
 from fastapi.templating import Jinja2Templates
 
 # ✅ FIX: Add the current 'backend' directory to sys.path 
-# This ensures Python finds database.py and ga_optimizer.py correctly
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
-# Now import local modules
-from database import SessionLocal, Vehicle, RouteHistory, init_db
+from database import SessionLocal, Vehicle, RouteHistory, User, init_db      # ← User added
 from ga_optimizer import genetic_algorithm, calculate_distance
+from auth import (                                                             # ← NEW import
+    verify_password, create_token, decode_token,
+    get_current_user, TOKEN_EXPIRE_MINUTES
+)
 
 app = FastAPI(title="Fleet Intelligence System")
 
-# ✅ FIXED: Use absolute path for templates to prevent TemplateNotFound error
 template_path = os.path.join(current_dir, "templates")
 templates = Jinja2Templates(directory=template_path)
 
-# Initialize database tables on startup
 init_db()
 
-# Global list to track active dashboard WebSocket connections
 dashboard_connections = []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ── NEW: AUTH HELPER ──
+# ─────────────────────────────────────────────────────────────────────────────
+def auth_guard(request: Request, role: str = "admin"):
+    """Returns a RedirectResponse if user is not logged in / wrong role, else None."""
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url=f"/login?next={request.url.path}", status_code=302)
+    if role == "admin" and user.get("role") != "admin":
+        return RedirectResponse(url="/driver", status_code=302)
+    if role == "driver" and user.get("role") not in ("driver", "admin"):
+        return RedirectResponse(url="/login", status_code=302)
+    return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ── NEW: LOGIN PAGE ──
+# ─────────────────────────────────────────────────────────────────────────────
+@app.get("/login")
+def login_page(request: Request):
+    user = get_current_user(request)
+    if user:
+        return RedirectResponse(url="/dashboard" if user["role"] == "admin" else "/driver", status_code=302)
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
+@app.post("/login")
+async def login(request: Request):
+    data     = await request.json()
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    role_req = data.get("role", "admin")
+
+    db   = SessionLocal()
+    user = db.query(User).filter(User.username == username, User.is_active == True).first()
+    db.close()
+
+    if not user or not verify_password(password, user.password_hash):
+        return JSONResponse(status_code=401, content={"success": False, "detail": "Invalid username or password."})
+
+    if role_req == "admin" and user.role != "admin":
+        return JSONResponse(status_code=403, content={"success": False, "detail": "This account does not have admin access."})
+
+    if role_req == "driver" and user.role not in ("driver", "admin"):
+        return JSONResponse(status_code=403, content={"success": False, "detail": "This account does not have driver access."})
+
+    token = create_token({"sub": user.username, "role": user.role, "full_name": user.full_name, "user_id": user.id},
+                         expires_delta=timedelta(minutes=TOKEN_EXPIRE_MINUTES))
+
+    response = JSONResponse(content={"success": True, "role": user.role})
+    response.set_cookie(key="fleet_token", value=token, httponly=True,
+                        max_age=TOKEN_EXPIRE_MINUTES * 60, samesite="lax", secure=False)
+    return response
+
+
+@app.get("/logout")
+def logout():
+    response = RedirectResponse(url="/login", status_code=302)
+    response.delete_cookie("fleet_token")
+    return response
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ── ORIGINAL ROUTES (unchanged logic, only auth guard added) ──
+# ─────────────────────────────────────────────────────────────────────────────
 
 @app.get("/manifest.json")
 def manifest():
@@ -63,32 +129,36 @@ def get_route_geometry(route):
             return data["routes"][0]["geometry"]["coordinates"]
     except Exception as e:
         print(f"OSRM API Error: {e}")
-    # Fallback to straight lines if API is down
     return [[p[1], p[0]] for p in route]
 
+
 @app.get("/")
-def home(request: Request): 
+def home(request: Request):
     """Renders the main Route Optimizer page."""
+    guard = auth_guard(request, role="admin")   # ← protected
+    if guard: return guard
     return templates.TemplateResponse("index.html", {"request": request})
+
 
 @app.get("/driver")
 def driver_page(request: Request):
     """Renders the Driver tracking page with available vehicles."""
+    guard = auth_guard(request, role="driver")  # ← protected
+    if guard: return guard
     db = SessionLocal()
     vehicles = db.query(Vehicle).all()
     db.close()
     return templates.TemplateResponse("driver.html", {"request": request, "vehicles": vehicles})
 
+
 @app.get("/dashboard")
 def dashboard(request: Request):
     """Renders the Admin Dashboard with stats and optimization history."""
+    guard = auth_guard(request, role="admin")   # ← protected
+    if guard: return guard
     db = SessionLocal()
     vehicles = db.query(Vehicle).all()
-    
-    # Fetch optimization records from history
     records_db = db.query(RouteHistory).order_by(RouteHistory.timestamp.desc()).all()
-    
-    # ✅ Convert DB objects to a simple list of dicts for JSON serialization in JS
     records = []
     for r in records_db:
         records.append({
@@ -98,10 +168,8 @@ def dashboard(request: Request):
             "fuel_saved": round(r.fuel_saved, 2),
             "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M") if r.timestamp else "-"
         })
-
     total_fuel = sum(r['fuel_saved'] for r in records) if records else 0
     db.close()
-    
     return templates.TemplateResponse("dashboard.html", {
         "request": request, 
         "vehicles": vehicles, 
@@ -112,6 +180,7 @@ def dashboard(request: Request):
         "avg_distance_saved": 0
     })
 
+
 @app.post("/optimize-route")
 async def optimize_route(data: dict):
     """Handles the route optimization request using Genetic Algorithm."""
@@ -120,20 +189,14 @@ async def optimize_route(data: dict):
     trucks = []
     total_opt = 0
     total_base = 0
-    
-    # Cluster points per truck
     chunks = cluster_locations(locations, num_trucks)
     db = SessionLocal()
-    
     for i, chunk in enumerate(chunks):
         if len(chunk) < 2: continue
-        # Calculate optimized route via GA
         route, opt = genetic_algorithm(chunk)
-        # Mock 'random' distance (30% worse than optimized) for comparison
         base = opt * 1.3 
         total_opt += opt
         total_base += base
-        
         trucks.append({
             "truck_id": i+1, 
             "route": route, 
@@ -144,13 +207,10 @@ async def optimize_route(data: dict):
                 "fuel_saved_litres": round((base-opt)/5, 2)
             }
         })
-        
     fuel_saved = (total_base - total_opt) / 5.0
-    # Save the run details to RouteHistory table
     db.add(RouteHistory(random_distance=total_base, optimized_distance=total_opt, fuel_saved=fuel_saved))
     db.commit()
     db.close()
-    
     return {
         "warehouse": [28.6139, 77.2090], 
         "trucks": trucks, 
@@ -163,6 +223,7 @@ async def optimize_route(data: dict):
         }
     }
 
+
 @app.websocket("/ws/driver/{vehicle_id}")
 async def driver_ws(websocket: WebSocket, vehicle_id: int):
     """WebSocket endpoint for receiving real-time GPS from drivers."""
@@ -174,12 +235,10 @@ async def driver_ws(websocket: WebSocket, vehicle_id: int):
             payload = json.loads(data)
             vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
             if vehicle:
-                # Update vehicle location in DB
                 vehicle.last_lat = payload["lat"]
                 vehicle.last_lng = payload["lng"]
                 vehicle.status = "active"
                 db.commit()
-                # Broadcast new coordinates to all active dashboards
                 for conn in dashboard_connections:
                     await conn.send_text(json.dumps({
                         "vehicle_id": vehicle_id, 
@@ -190,6 +249,7 @@ async def driver_ws(websocket: WebSocket, vehicle_id: int):
         pass
     finally:
         db.close()
+
 
 @app.websocket("/ws/dashboard")
 async def dashboard_ws(websocket: WebSocket):
